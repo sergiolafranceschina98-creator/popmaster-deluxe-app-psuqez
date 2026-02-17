@@ -1,22 +1,24 @@
 
 import React, { useEffect } from 'react';
-import { StyleSheet, Pressable, Platform } from 'react-native';
+import { StyleSheet, Pressable, Platform, View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   withSequence,
   withTiming,
+  withRepeat,
   runOnJS,
 } from 'react-native-reanimated';
 import { Bubble as BubbleType } from '@/types/game';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface BubbleProps {
   bubble: BubbleType;
   onPop: (id: string) => void;
+  mode?: 'bubble' | 'rush';
 }
 
-// Simple pop sound using Web Audio API for web, native audio for mobile
 const playPopSound = async () => {
   if (Platform.OS === 'web') {
     try {
@@ -41,16 +43,49 @@ const playPopSound = async () => {
   }
 };
 
-export default function Bubble({ bubble, onPop }: BubbleProps) {
+export default function Bubble({ bubble, onPop, mode = 'bubble' }: BubbleProps) {
   const scale = useSharedValue(0);
   const opacity = useSharedValue(1);
+  const rotation = useSharedValue(0);
+  const floatY = useSharedValue(0);
 
   useEffect(() => {
     scale.value = withSpring(1, {
       damping: 8,
       stiffness: 100,
     });
-  }, []);
+    
+    if (mode === 'bubble') {
+      floatY.value = withRepeat(
+        withSequence(
+          withTiming(-10, { duration: 2000 }),
+          withTiming(10, { duration: 2000 })
+        ),
+        -1,
+        true
+      );
+      
+      rotation.value = withRepeat(
+        withSequence(
+          withTiming(-5, { duration: 3000 }),
+          withTiming(5, { duration: 3000 })
+        ),
+        -1,
+        true
+      );
+    }
+    
+    if (mode === 'rush') {
+      scale.value = withRepeat(
+        withSequence(
+          withTiming(1.1, { duration: 300 }),
+          withTiming(0.9, { duration: 300 })
+        ),
+        -1,
+        true
+      );
+    }
+  }, [mode]);
 
   const handlePress = () => {
     console.log('Bubble tapped:', bubble.id);
@@ -58,18 +93,37 @@ export default function Bubble({ bubble, onPop }: BubbleProps) {
     playPopSound();
     
     scale.value = withSequence(
-      withTiming(1.3, { duration: 100 }),
-      withTiming(0, { duration: 150 })
+      withTiming(1.4, { duration: 80 }),
+      withTiming(0, { duration: 120 })
     );
-    opacity.value = withTiming(0, { duration: 200 }, () => {
+    opacity.value = withTiming(0, { duration: 150 }, () => {
       runOnJS(onPop)(bubble.id);
     });
   };
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [
+      { scale: scale.value },
+      { translateY: floatY.value },
+      { rotate: `${rotation.value}deg` },
+    ],
     opacity: opacity.value,
   }));
+
+  const getGradientColors = (baseColor: string) => {
+    const lighten = (color: string) => {
+      const hex = color.replace('#', '');
+      const r = Math.min(255, parseInt(hex.substr(0, 2), 16) + 40);
+      const g = Math.min(255, parseInt(hex.substr(2, 2), 16) + 40);
+      const b = Math.min(255, parseInt(hex.substr(4, 2), 16) + 40);
+      const newHex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      return newHex;
+    };
+    
+    return [lighten(baseColor), baseColor];
+  };
+
+  const gradientColors = getGradientColors(bubble.color);
 
   return (
     <Animated.View
@@ -81,15 +135,22 @@ export default function Bubble({ bubble, onPop }: BubbleProps) {
           width: bubble.size,
           height: bubble.size,
           borderRadius: bubble.size / 2,
-          backgroundColor: bubble.color,
         },
         animatedStyle,
       ]}
     >
-      <Pressable
-        style={styles.pressable}
-        onPress={handlePress}
-      />
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradient}
+      >
+        <View style={styles.shine} />
+        <Pressable
+          style={styles.pressable}
+          onPress={handlePress}
+        />
+      </LinearGradient>
     </Animated.View>
   );
 }
@@ -98,10 +159,26 @@ const styles = StyleSheet.create({
   bubble: {
     position: 'absolute',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  gradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 9999,
+    position: 'relative',
+  },
+  shine: {
+    position: 'absolute',
+    top: '15%',
+    left: '20%',
+    width: '30%',
+    height: '30%',
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
   pressable: {
     width: '100%',
