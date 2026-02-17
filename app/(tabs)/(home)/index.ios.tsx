@@ -34,6 +34,8 @@ const GAME_MODES: ModeCard[] = [
     description: 'Classic popping fun with satisfying effects',
     icon: 'bubble-chart',
     gradient: ['#FF6B9D', '#FF8FAB'],
+    textColor: '#FFFFFF',
+    iconColor: '#FFFFFF',
   },
   {
     id: 'chain',
@@ -41,6 +43,8 @@ const GAME_MODES: ModeCard[] = [
     description: 'Create chain reactions for bigger rewards',
     icon: 'link',
     gradient: ['#4ECDC4', '#6ED9D2'],
+    textColor: '#FFFFFF',
+    iconColor: '#FFFFFF',
   },
   {
     id: 'pattern',
@@ -48,6 +52,8 @@ const GAME_MODES: ModeCard[] = [
     description: 'Memory game - match pairs to win',
     icon: 'grid-on',
     gradient: ['#9C27B0', '#BA68C8'],
+    textColor: '#FFFFFF',
+    iconColor: '#FFFFFF',
   },
   {
     id: 'rush',
@@ -55,6 +61,8 @@ const GAME_MODES: ModeCard[] = [
     description: 'Pop as many as you can in 60 seconds!',
     icon: 'timer',
     gradient: ['#A78BFA', '#BFA3FC'],
+    textColor: '#FFFFFF',
+    iconColor: '#FFFFFF',
   },
 ];
 
@@ -84,9 +92,8 @@ export default function HomeScreen() {
       >
         {GAME_MODES.map((mode) => {
           const isSelected = selectedMode === mode.id;
-          const textColor = mode.textColor || colors.text;
-          const iconColor = mode.iconColor || colors.text;
-          const descriptionColor = mode.textColor ? `${mode.textColor}CC` : 'rgba(255, 255, 255, 0.9)';
+          const textColor = mode.textColor || '#FFFFFF';
+          const iconColor = mode.iconColor || '#FFFFFF';
           
           return (
             <Pressable
@@ -113,7 +120,7 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.modeContent}>
                   <Text style={[styles.modeTitle, { color: textColor }]}>{mode.title}</Text>
-                  <Text style={[styles.modeDescription, { color: descriptionColor }]}>{mode.description}</Text>
+                  <Text style={[styles.modeDescription, { color: textColor }]}>{mode.description}</Text>
                 </View>
               </LinearGradient>
             </Pressable>
@@ -184,7 +191,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -196,9 +203,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   modeDescription: {
     fontSize: 14,
+    opacity: 0.95,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   footer: {
     position: 'absolute',
