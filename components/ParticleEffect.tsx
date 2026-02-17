@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
   withSpring,
   Easing,
+  runOnJS,
 } from 'react-native-reanimated';
 
 interface ParticleEffectProps {
@@ -30,8 +31,10 @@ export default function ParticleEffect({ x, y, color, onComplete }: ParticleEffe
     opacity.value = withTiming(0, {
       duration: 600,
       easing: Easing.out(Easing.ease),
-    }, () => {
-      onComplete();
+    }, (finished) => {
+      if (finished) {
+        runOnJS(onComplete)();
+      }
     });
     
     translateY.value = withTiming(-50, {
