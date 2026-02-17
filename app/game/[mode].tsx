@@ -11,7 +11,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/styles/commonStyles';
-import { Bubble as BubbleType, GameMode, Tile, ColorCell } from '@/types/game';
+import { Bubble as BubbleType, GameMode, Tile, PatternCard } from '@/types/game';
 import Bubble from '@/components/Bubble';
 import ParticleEffect from '@/components/ParticleEffect';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -38,15 +38,16 @@ const TILE_COLORS = [
   '#FF8B94',
 ];
 
-const FLOW_COLORS = [
+const PATTERN_SYMBOLS = ['★', '♥', '♦', '♣', '♠', '●', '■', '▲'];
+const PATTERN_COLORS = [
   '#FF6B9D',
-  '#C44569',
-  '#FFA07A',
-  '#98D8C8',
-  '#6C5CE7',
-  '#A29BFE',
-  '#FD79A8',
-  '#FDCB6E',
+  '#4ECDC4',
+  '#FFE66D',
+  '#A8E6CF',
+  '#FF8B94',
+  '#9C27B0',
+  '#FFA726',
+  '#26C6DA',
 ];
 
 interface Particle {
@@ -68,9 +69,11 @@ export default function GameScreen() {
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [selectedTiles, setSelectedTiles] = useState<string[]>([]);
   
-  // Color Flow Mode state
-  const [colorGrid, setColorGrid] = useState<ColorCell[][]>([]);
-  const [currentFlowColor, setCurrentFlowColor] = useState(FLOW_COLORS[0]);
+  // Pattern Match Mode state
+  const [patternCards, setPatternCards] = useState<PatternCard[]>([]);
+  const [flippedCards, setFlippedCards] = useState<string[]>([]);
+  const [matchedPairs, setMatchedPairs] = useState(0);
+  const [moves, setMoves] = useState(0);
   
   // Rush Mode state
   const [rushTargets, setRushTargets] = useState<BubbleType[]>([]);
@@ -112,13 +115,16 @@ export default function GameScreen() {
     setTimeLeft(60);
     setGameOver(false);
     setParticles([]);
+    setMoves(0);
+    setMatchedPairs(0);
+    setFlippedCards([]);
     
     if (mode === 'bubble') {
       generateBubbles();
     } else if (mode === 'chain') {
       generateTileGrid();
-    } else if (mode === 'color') {
-      generateColorGrid();
+    } else if (mode === 'pattern') {
+      generatePatternGrid();
     } else if (mode === 'rush') {
       generateRushTargets();
     }
@@ -275,123 +281,135 @@ export default function GameScreen() {
     }
   }, [tiles, incrementPops, updateChain]);
 
-  // COLOR FLOW MODE - Paint spreading simulation
-  const generateColorGrid = useCallback(() => {
-    const cols = 12;
-    const rows = 16;
-    const cellSize = (width - 40) / cols;
-    const newGrid: ColorCell[][] = [];
+  // PATTERN MATCH MODE - Memory card matching game
+  const generatePatternGrid = useCallback(() => {
+    const cols = 4;
+    const rows = 4;
+    const cardSize = (width - 60) / cols;
+    const totalPairs = (cols * rows) / 2;
     
+    // Create pairs of symbols
+    const symbols: Array<{ symbol: string; color: string }> = [];
+    for (let i = 0; i < totalPairs; i++) {
+      const symbol = PATTERN_SYMBOLS[i % PATTERN_SYMBOLS.length];
+      const color = PATTERN_COLORS[i % PATTERN_COLORS.length];
+      symbols.push({ symbol, color });
+      symbols.push({ symbol, color });
+    }
+    
+    // Shuffle the symbols
+    for (let i = symbols.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [symbols[i], symbols[j]] = [symbols[j], symbols[i]];
+    }
+    
+    // Create cards
+    const newCards: PatternCard[] = [];
+    let index = 0;
     for (let row = 0; row < rows; row++) {
-      const rowCells: ColorCell[] = [];
       for (let col = 0; col < cols; col++) {
-        rowCells.push({
-          id: `cell-${row}-${col}`,
-          x: 20 + col * cellSize,
-          y: 120 + row * cellSize,
-          color: '#1A1A2E',
-          size: cellSize - 2,
+        const { symbol, color } = symbols[index];
+        newCards.push({
+          id: `card-${row}-${col}`,
+          x: 20 + col * cardSize,
+          y: 140 + row * cardSize,
+          size: cardSize - 8,
           row,
           col,
-          intensity: 0,
+          symbol,
+          color,
+          isFlipped: false,
+          isMatched: false,
         });
+        index++;
       }
-      newGrid.push(rowCells);
     }
     
-    setColorGrid(newGrid);
-    setCurrentFlowColor(FLOW_COLORS[0]);
+    setPatternCards(newCards);
+    setFlippedCards([]);
+    setMatchedPairs(0);
+    setMoves(0);
   }, []);
 
-  const handleColorFlowTap = useCallback((row: number, col: number) => {
-    console.log('Color flow tap at:', row, col);
+  const handlePatternCardTap = useCallback((cardId: string) => {
+    console.log('Pattern card tapped:', cardId);
     
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+    const card = patternCards.find(c => c.id === cardId);
+    if (!card || card.isFlipped || card.isMatched || flippedCards.length >= 2) {
+      return;
     }
     
-    const newColor = currentFlowColor;
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     
-    // Use functional update to avoid stale state
-    setColorGrid(prevGrid => {
-      // Validate grid exists
-      if (!prevGrid || prevGrid.length === 0 || !prevGrid[0]) {
-        console.log('Grid not initialized yet');
-        return prevGrid;
-      }
+    // Flip the card
+    setPatternCards(prev => prev.map(c => 
+      c.id === cardId ? { ...c, isFlipped: true } : c
+    ));
+    
+    const newFlippedCards = [...flippedCards, cardId];
+    setFlippedCards(newFlippedCards);
+    
+    // Check for match when two cards are flipped
+    if (newFlippedCards.length === 2) {
+      setMoves(prev => prev + 1);
       
-      // Validate tap coordinates
-      if (row < 0 || row >= prevGrid.length || col < 0 || col >= prevGrid[0].length) {
-        console.log('Invalid tap coordinates:', row, col);
-        return prevGrid;
-      }
+      const card1 = patternCards.find(c => c.id === newFlippedCards[0]);
+      const card2 = patternCards.find(c => c.id === newFlippedCards[1]);
       
-      // Calculate all cells to update using BFS
-      const cellsToUpdate: Array<{ row: number; col: number; intensity: number }> = [];
-      const visited = new Set<string>();
-      const queue: Array<{ row: number; col: number; intensity: number; depth: number }> = [
-        { row, col, intensity: 1, depth: 0 }
-      ];
-      
-      const maxDepth = 4;
-      const rows = prevGrid.length;
-      const cols = prevGrid[0].length;
-      
-      while (queue.length > 0) {
-        const current = queue.shift();
-        if (!current) break;
+      if (card1 && card2 && card1.symbol === card2.symbol && card1.color === card2.color) {
+        // Match found!
+        console.log('Match found!');
         
-        const key = `${current.row}-${current.col}`;
-        
-        if (visited.has(key)) continue;
-        if (current.row < 0 || current.row >= rows) continue;
-        if (current.col < 0 || current.col >= cols) continue;
-        if (current.depth > maxDepth) continue;
-        if (current.intensity < 0.1) continue;
-        
-        visited.add(key);
-        cellsToUpdate.push({
-          row: current.row,
-          col: current.col,
-          intensity: current.intensity,
-        });
-        
-        const nextIntensity = current.intensity * 0.7;
-        const nextDepth = current.depth + 1;
-        
-        if (nextDepth <= maxDepth && nextIntensity >= 0.1) {
-          queue.push({ row: current.row - 1, col: current.col, intensity: nextIntensity, depth: nextDepth });
-          queue.push({ row: current.row + 1, col: current.col, intensity: nextIntensity, depth: nextDepth });
-          queue.push({ row: current.row, col: current.col - 1, intensity: nextIntensity, depth: nextDepth });
-          queue.push({ row: current.row, col: current.col + 1, intensity: nextIntensity, depth: nextDepth });
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-      }
-      
-      console.log('Updating', cellsToUpdate.length, 'cells with color', newColor);
-      
-      // Create new grid with updates
-      const newGrid = prevGrid.map(rowArray => rowArray.map(cell => ({ ...cell })));
-      
-      cellsToUpdate.forEach(({ row: r, col: c, intensity }) => {
-        if (newGrid[r] && newGrid[r][c]) {
-          const currentIntensity = newGrid[r][c].intensity;
-          newGrid[r][c] = {
-            ...newGrid[r][c],
-            color: newColor,
-            intensity: Math.min(1, currentIntensity + intensity),
-          };
+        
+        setTimeout(() => {
+          setPatternCards(prev => prev.map(c => 
+            newFlippedCards.includes(c.id) ? { ...c, isMatched: true } : c
+          ));
+          
+          // Create particles for matched cards
+          [card1, card2].forEach(matchedCard => {
+            const newParticle: Particle = {
+              id: `particle-${Date.now()}-${matchedCard.id}`,
+              x: matchedCard.x + matchedCard.size / 2,
+              y: matchedCard.y + matchedCard.size / 2,
+              color: matchedCard.color,
+            };
+            setParticles(prev => [...prev, newParticle]);
+          });
+          
+          setFlippedCards([]);
+          setMatchedPairs(prev => prev + 1);
+          setScore(prev => prev + 100);
+          incrementPops(2);
+          
+          // Check if game is complete
+          if (matchedPairs + 1 === patternCards.length / 2) {
+            console.log('Pattern Match game completed!');
+            setTimeout(() => handleGameEnd(), 1000);
+          }
+        }, 500);
+      } else {
+        // No match - flip cards back
+        console.log('No match - flipping back');
+        
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
-      });
-      
-      return newGrid;
-    });
-    
-    setScore(prev => prev + 5);
-    incrementPops(1);
-    
-    const nextColorIndex = (FLOW_COLORS.indexOf(currentFlowColor) + 1) % FLOW_COLORS.length;
-    setCurrentFlowColor(FLOW_COLORS[nextColorIndex]);
-  }, [currentFlowColor, incrementPops]);
+        
+        setTimeout(() => {
+          setPatternCards(prev => prev.map(c => 
+            newFlippedCards.includes(c.id) ? { ...c, isFlipped: false } : c
+          ));
+          setFlippedCards([]);
+        }, 1000);
+      }
+    }
+  }, [patternCards, flippedCards, matchedPairs, incrementPops]);
 
   // RUSH MODE - Fast-paced target popping
   const generateRushTargets = useCallback(() => {
@@ -462,7 +480,7 @@ export default function GameScreen() {
     switch (mode) {
       case 'bubble': return 'Bubble Pop';
       case 'chain': return 'Chain Pop';
-      case 'color': return 'Color Flow';
+      case 'pattern': return 'Pattern Match';
       case 'rush': return 'Rush Mode';
       default: return 'PopMaster';
     }
@@ -474,6 +492,8 @@ export default function GameScreen() {
   const timeText = `${timeLeft}s`;
   const finalScoreText = `Final Score: ${score}`;
   const comboText = `${comboMultiplier.toFixed(1)}x`;
+  const movesText = moves.toString();
+  const pairsText = `${matchedPairs}/${patternCards.length / 2}`;
 
   return (
     <>
@@ -518,7 +538,20 @@ export default function GameScreen() {
             </View>
           )}
           
-          {mode !== 'color' && (
+          {mode === 'pattern' && (
+            <>
+              <View style={styles.statCard}>
+                <Text style={styles.statLabel}>Moves</Text>
+                <Text style={styles.statValue}>{movesText}</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statLabel}>Pairs</Text>
+                <Text style={styles.statValue}>{pairsText}</Text>
+              </View>
+            </>
+          )}
+          
+          {mode !== 'pattern' && (
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>Pops</Text>
               <Text style={styles.statValue}>{chainText}</Text>
@@ -553,30 +586,40 @@ export default function GameScreen() {
             </Pressable>
           ))}
           
-          {/* COLOR FLOW MODE */}
-          {mode === 'color' && (
-            <View style={styles.colorGridContainer}>
-              {colorGrid.map((row, rowIndex) => (
-                <View key={`row-${rowIndex}`} style={styles.colorRow}>
-                  {row.map((cell) => (
-                    <Pressable
-                      key={cell.id}
-                      style={[
-                        styles.colorCell,
-                        {
-                          width: cell.size,
-                          height: cell.size,
-                          backgroundColor: cell.color,
-                          opacity: 0.3 + cell.intensity * 0.7,
-                        },
-                      ]}
-                      onPress={() => handleColorFlowTap(cell.row, cell.col)}
-                    />
-                  ))}
-                </View>
-              ))}
-            </View>
-          )}
+          {/* PATTERN MATCH MODE */}
+          {mode === 'pattern' && patternCards.map((card) => {
+            const cardSymbol = card.symbol;
+            const cardColor = card.color;
+            
+            return (
+              <Pressable
+                key={card.id}
+                style={[
+                  styles.patternCard,
+                  {
+                    left: card.x,
+                    top: card.y,
+                    width: card.size,
+                    height: card.size,
+                    opacity: card.isMatched ? 0 : 1,
+                  },
+                ]}
+                onPress={() => handlePatternCardTap(card.id)}
+              >
+                <LinearGradient
+                  colors={card.isFlipped || card.isMatched ? [cardColor, cardColor] : ['#2A2A3E', '#1A1A2E']}
+                  style={styles.patternCardInner}
+                >
+                  {(card.isFlipped || card.isMatched) && (
+                    <Text style={styles.patternSymbol}>{cardSymbol}</Text>
+                  )}
+                  {!card.isFlipped && !card.isMatched && (
+                    <Text style={styles.patternCardBack}>?</Text>
+                  )}
+                </LinearGradient>
+              </Pressable>
+            );
+          })}
           
           {/* RUSH MODE */}
           {mode === 'rush' && rushTargets.map((target) => (
@@ -602,8 +645,13 @@ export default function GameScreen() {
               style={StyleSheet.absoluteFill}
             />
             <View style={styles.gameOverCard}>
-              <Text style={styles.gameOverTitle}>Time&apos;s Up!</Text>
+              <Text style={styles.gameOverTitle}>
+                {mode === 'pattern' ? 'Complete!' : 'Time&apos;s Up!'}
+              </Text>
               <Text style={styles.gameOverScore}>{finalScoreText}</Text>
+              {mode === 'pattern' && (
+                <Text style={styles.gameOverMoves}>Moves: {movesText}</Text>
+              )}
               <Pressable style={styles.playAgainButton} onPress={handlePlayAgain}>
                 <Text style={styles.playAgainText}>Play Again</Text>
               </Pressable>
@@ -662,17 +710,28 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 6,
   },
-  colorGridContainer: {
+  patternCard: {
+    position: 'absolute',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  patternCardInner: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 12,
   },
-  colorRow: {
-    flexDirection: 'row',
+  patternSymbol: {
+    fontSize: 40,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
-  colorCell: {
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.1)',
+  patternCardBack: {
+    fontSize: 48,
+    color: 'rgba(255,255,255,0.3)',
+    fontWeight: 'bold',
   },
   gameOverOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -694,6 +753,11 @@ const styles = StyleSheet.create({
   },
   gameOverScore: {
     fontSize: 20,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  gameOverMoves: {
+    fontSize: 16,
     color: colors.textSecondary,
     marginBottom: 24,
   },

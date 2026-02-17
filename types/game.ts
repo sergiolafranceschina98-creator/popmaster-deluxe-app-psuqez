@@ -1,5 +1,5 @@
 
-export type GameMode = 'bubble' | 'chain' | 'color' | 'rush';
+export type GameMode = 'bubble' | 'chain' | 'pattern' | 'rush';
 
 export interface Bubble {
   id: string;
@@ -21,15 +21,17 @@ export interface Tile {
   matched: boolean;
 }
 
-export interface ColorCell {
+export interface PatternCard {
   id: string;
   x: number;
   y: number;
-  color: string;
   size: number;
   row: number;
   col: number;
-  intensity: number;
+  symbol: string;
+  color: string;
+  isFlipped: boolean;
+  isMatched: boolean;
 }
 
 export interface UnlockedItem {

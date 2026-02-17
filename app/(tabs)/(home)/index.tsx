@@ -44,13 +44,11 @@ const GAME_MODES: ModeCard[] = [
     gradient: ['#4ECDC4', '#6ED9D2'],
   },
   {
-    id: 'color',
-    title: 'Color Flow',
-    description: 'Zen mode - paint with flowing colors',
-    icon: 'palette',
-    gradient: ['#FFE66D', '#FFED8B'],
-    textColor: '#1A1A35',
-    iconColor: '#1A1A35',
+    id: 'pattern',
+    title: 'Pattern Match',
+    description: 'Memory game - match pairs to win',
+    icon: 'grid-on',
+    gradient: ['#9C27B0', '#BA68C8'],
   },
   {
     id: 'rush',
