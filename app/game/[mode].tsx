@@ -310,35 +310,62 @@ export default function GameScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
     }
     
-    const spreadColor = (r: number, c: number, intensity: number) => {
-      if (r < 0 || r >= colorGrid.length || c < 0 || c >= colorGrid[0].length) return;
-      if (intensity <= 0) return;
+    // Calculate all cells to update in a single pass using BFS
+    const cellsToUpdate: Array<{ row: number; col: number; intensity: number }> = [];
+    const visited = new Set<string>();
+    const queue: Array<{ row: number; col: number; intensity: number; depth: number }> = [
+      { row, col, intensity: 1, depth: 0 }
+    ];
+    
+    const maxDepth = 4;
+    
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current) break;
       
-      setColorGrid(prev => {
-        const newGrid = [...prev];
+      const key = `${current.row}-${current.col}`;
+      
+      if (visited.has(key)) continue;
+      if (current.row < 0 || current.row >= colorGrid.length) continue;
+      if (current.col < 0 || current.col >= colorGrid[0].length) continue;
+      if (current.depth > maxDepth) continue;
+      if (current.intensity < 0.1) continue;
+      
+      visited.add(key);
+      cellsToUpdate.push({
+        row: current.row,
+        col: current.col,
+        intensity: current.intensity,
+      });
+      
+      const nextIntensity = current.intensity * 0.7;
+      const nextDepth = current.depth + 1;
+      
+      if (nextDepth <= maxDepth && nextIntensity >= 0.1) {
+        queue.push({ row: current.row - 1, col: current.col, intensity: nextIntensity, depth: nextDepth });
+        queue.push({ row: current.row + 1, col: current.col, intensity: nextIntensity, depth: nextDepth });
+        queue.push({ row: current.row, col: current.col - 1, intensity: nextIntensity, depth: nextDepth });
+        queue.push({ row: current.row, col: current.col + 1, intensity: nextIntensity, depth: nextDepth });
+      }
+    }
+    
+    // Update all cells in a single state update
+    setColorGrid(prev => {
+      const newGrid = prev.map(row => row.map(cell => ({ ...cell })));
+      
+      cellsToUpdate.forEach(({ row: r, col: c, intensity }) => {
         if (newGrid[r] && newGrid[r][c]) {
-          newGrid[r] = [...newGrid[r]];
+          const currentIntensity = newGrid[r][c].intensity;
           newGrid[r][c] = {
             ...newGrid[r][c],
             color: currentFlowColor,
-            intensity: Math.min(1, newGrid[r][c].intensity + intensity),
+            intensity: Math.min(1, currentIntensity + intensity),
           };
         }
-        return newGrid;
       });
       
-      setTimeout(() => {
-        const nextIntensity = intensity * 0.6;
-        if (nextIntensity > 0.1) {
-          spreadColor(r - 1, c, nextIntensity);
-          spreadColor(r + 1, c, nextIntensity);
-          spreadColor(r, c - 1, nextIntensity);
-          spreadColor(r, c + 1, nextIntensity);
-        }
-      }, 50);
-    };
-    
-    spreadColor(row, col, 1);
+      return newGrid;
+    });
     
     setScore(prev => prev + 5);
     incrementPops(1);
