@@ -310,55 +310,74 @@ export default function GameScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
     }
     
-    // Calculate all cells to update in a single pass using BFS
-    const cellsToUpdate: Array<{ row: number; col: number; intensity: number }> = [];
-    const visited = new Set<string>();
-    const queue: Array<{ row: number; col: number; intensity: number; depth: number }> = [
-      { row, col, intensity: 1, depth: 0 }
-    ];
+    const newColor = currentFlowColor;
     
-    const maxDepth = 4;
-    
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (!current) break;
-      
-      const key = `${current.row}-${current.col}`;
-      
-      if (visited.has(key)) continue;
-      if (current.row < 0 || current.row >= colorGrid.length) continue;
-      if (current.col < 0 || current.col >= colorGrid[0].length) continue;
-      if (current.depth > maxDepth) continue;
-      if (current.intensity < 0.1) continue;
-      
-      visited.add(key);
-      cellsToUpdate.push({
-        row: current.row,
-        col: current.col,
-        intensity: current.intensity,
-      });
-      
-      const nextIntensity = current.intensity * 0.7;
-      const nextDepth = current.depth + 1;
-      
-      if (nextDepth <= maxDepth && nextIntensity >= 0.1) {
-        queue.push({ row: current.row - 1, col: current.col, intensity: nextIntensity, depth: nextDepth });
-        queue.push({ row: current.row + 1, col: current.col, intensity: nextIntensity, depth: nextDepth });
-        queue.push({ row: current.row, col: current.col - 1, intensity: nextIntensity, depth: nextDepth });
-        queue.push({ row: current.row, col: current.col + 1, intensity: nextIntensity, depth: nextDepth });
+    // Use functional update to avoid stale state
+    setColorGrid(prevGrid => {
+      // Validate grid exists
+      if (!prevGrid || prevGrid.length === 0 || !prevGrid[0]) {
+        console.log('Grid not initialized yet');
+        return prevGrid;
       }
-    }
-    
-    // Update all cells in a single state update
-    setColorGrid(prev => {
-      const newGrid = prev.map(row => row.map(cell => ({ ...cell })));
+      
+      // Validate tap coordinates
+      if (row < 0 || row >= prevGrid.length || col < 0 || col >= prevGrid[0].length) {
+        console.log('Invalid tap coordinates:', row, col);
+        return prevGrid;
+      }
+      
+      // Calculate all cells to update using BFS
+      const cellsToUpdate: Array<{ row: number; col: number; intensity: number }> = [];
+      const visited = new Set<string>();
+      const queue: Array<{ row: number; col: number; intensity: number; depth: number }> = [
+        { row, col, intensity: 1, depth: 0 }
+      ];
+      
+      const maxDepth = 4;
+      const rows = prevGrid.length;
+      const cols = prevGrid[0].length;
+      
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (!current) break;
+        
+        const key = `${current.row}-${current.col}`;
+        
+        if (visited.has(key)) continue;
+        if (current.row < 0 || current.row >= rows) continue;
+        if (current.col < 0 || current.col >= cols) continue;
+        if (current.depth > maxDepth) continue;
+        if (current.intensity < 0.1) continue;
+        
+        visited.add(key);
+        cellsToUpdate.push({
+          row: current.row,
+          col: current.col,
+          intensity: current.intensity,
+        });
+        
+        const nextIntensity = current.intensity * 0.7;
+        const nextDepth = current.depth + 1;
+        
+        if (nextDepth <= maxDepth && nextIntensity >= 0.1) {
+          queue.push({ row: current.row - 1, col: current.col, intensity: nextIntensity, depth: nextDepth });
+          queue.push({ row: current.row + 1, col: current.col, intensity: nextIntensity, depth: nextDepth });
+          queue.push({ row: current.row, col: current.col - 1, intensity: nextIntensity, depth: nextDepth });
+          queue.push({ row: current.row, col: current.col + 1, intensity: nextIntensity, depth: nextDepth });
+        }
+      }
+      
+      console.log('Updating', cellsToUpdate.length, 'cells with color', newColor);
+      
+      // Create new grid with updates
+      const newGrid = prevGrid.map(rowArray => rowArray.map(cell => ({ ...cell })));
       
       cellsToUpdate.forEach(({ row: r, col: c, intensity }) => {
         if (newGrid[r] && newGrid[r][c]) {
           const currentIntensity = newGrid[r][c].intensity;
           newGrid[r][c] = {
             ...newGrid[r][c],
-            color: currentFlowColor,
+            color: newColor,
             intensity: Math.min(1, currentIntensity + intensity),
           };
         }
@@ -372,7 +391,7 @@ export default function GameScreen() {
     
     const nextColorIndex = (FLOW_COLORS.indexOf(currentFlowColor) + 1) % FLOW_COLORS.length;
     setCurrentFlowColor(FLOW_COLORS[nextColorIndex]);
-  }, [colorGrid, currentFlowColor, incrementPops]);
+  }, [currentFlowColor, incrementPops]);
 
   // RUSH MODE - Fast-paced target popping
   const generateRushTargets = useCallback(() => {
