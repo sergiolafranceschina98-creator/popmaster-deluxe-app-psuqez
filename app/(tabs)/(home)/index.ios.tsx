@@ -1,5 +1,4 @@
 
-import React, { useState, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,6 +7,7 @@ import {
   Dimensions,
   ScrollView,
 } from 'react-native';
+import React, { useState, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, commonStyles } from '@/styles/commonStyles';
 import { GameMode } from '@/types/game';
@@ -23,6 +23,8 @@ interface ModeCard {
   description: string;
   icon: string;
   gradient: string[];
+  textColor?: string;
+  iconColor?: string;
 }
 
 const GAME_MODES: ModeCard[] = [
@@ -46,6 +48,8 @@ const GAME_MODES: ModeCard[] = [
     description: 'Zen mode - paint with flowing colors',
     icon: 'palette',
     gradient: ['#FFE66D', '#FFED8B'],
+    textColor: '#1A1A35',
+    iconColor: '#1A1A35',
   },
   {
     id: 'rush',
@@ -82,6 +86,9 @@ export default function HomeScreen() {
       >
         {GAME_MODES.map((mode) => {
           const isSelected = selectedMode === mode.id;
+          const textColor = mode.textColor || colors.text;
+          const iconColor = mode.iconColor || colors.text;
+          const descriptionColor = mode.textColor ? `${mode.textColor}CC` : 'rgba(255, 255, 255, 0.9)';
           
           return (
             <Pressable
@@ -101,15 +108,14 @@ export default function HomeScreen() {
               >
                 <View style={styles.modeIcon}>
                   <IconSymbol
-                    ios_icon_name={mode.icon}
                     android_material_icon_name={mode.icon as any}
                     size={40}
-                    color={colors.text}
+                    color={iconColor}
                   />
                 </View>
                 <View style={styles.modeContent}>
-                  <Text style={styles.modeTitle}>{mode.title}</Text>
-                  <Text style={styles.modeDescription}>{mode.description}</Text>
+                  <Text style={[styles.modeTitle, { color: textColor }]}>{mode.title}</Text>
+                  <Text style={[styles.modeDescription, { color: descriptionColor }]}>{mode.description}</Text>
                 </View>
               </LinearGradient>
             </Pressable>
@@ -191,12 +197,10 @@ const styles = StyleSheet.create({
   modeTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: colors.text,
     marginBottom: 4,
   },
   modeDescription: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
   },
   footer: {
     position: 'absolute',
